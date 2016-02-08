@@ -37,13 +37,13 @@
                ad-id (rand-int 10)]
              ;; Send the impression.
              (>!! impression-chan [id ad-id])
-             ;; Send the click event if rand is less than 0.002
-             ;; (0.2% clickthrough per ad on average). Send on a background 
+             ;; Send the click event if rand is less than 0.2
+             ;; (20% clickthrough per ad on average). Send on a background 
              ;; thread that "waits"a certain number of seconds between 
              ;; 10 and 20. It's entirely possible too many threads could be 
              ;; created. If that's the case just restart the program.
-             (when (< (rand) 0.002)
-                   (thread (while true
-                              ;; Sleep ten seconds + 0-10 additional seconds.
-                              (Thread/sleep (+ 10000 (* 1000 (rand-int 10))))
-                              (>!! click-chan [id ad-id])))))))))
+             (when (< (rand) 0.2)
+                   (thread 
+                      ;; Sleep ten seconds + 0-10 additional seconds.
+                      (Thread/sleep (+ 10000 (* 1000 (rand-int 10))))
+                      (>!! click-chan [id ad-id]))))))))
