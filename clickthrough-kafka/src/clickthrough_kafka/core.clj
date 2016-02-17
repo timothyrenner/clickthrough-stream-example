@@ -1,6 +1,6 @@
 (ns clickthrough-kafka.core
     (:require [clojure.core.async :as async 
-                :refer [<!! >!! thread chan go <!]]
+                :refer [chan go <! >! timeout]]
               [clj-kafka.new.producer :as kafka 
                 :refer [producer send record byte-array-serializer]]
               [clj-uuid :as uuid])
@@ -36,14 +36,13 @@
          (let [id (uuid/v4)
                ad-id (rand-int 10)]
              ;; Send the impression.
-             (>!! impression-chan [id ad-id])
+             (go (>! impression-chan [id ad-id]))
              ;; Send the click event if rand is less than 0.2
              ;; (20% clickthrough per ad on average). Send on a background 
              ;; thread that "waits"a certain number of seconds between 
-             ;; 10 and 20. It's entirely possible too many threads could be 
-             ;; created. If that's the case just restart the program.
+             ;; 10 and 20.
              (when (< (rand) 0.2)
-                   (thread 
+                   (go 
                       ;; Sleep ten seconds + 0-10 additional seconds.
-                      (Thread/sleep (+ 10000 (* 1000 (rand-int 10))))
-                      (>!! click-chan [id ad-id]))))))))
+                      (<! (timeout  (+ 10000 (* 1000 (rand-int 10)))))
+                      (>! click-chan [id ad-id]))))))))
