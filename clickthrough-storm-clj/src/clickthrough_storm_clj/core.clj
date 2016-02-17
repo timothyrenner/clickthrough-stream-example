@@ -56,17 +56,16 @@
             (ack! collector tuple))
           
 ;; Join impressions and clicks.
-;; Note that this solution is not "industrial strength" - the bloom filters 
+;; Note that this solution is not "industrial strength" - the bloom filter
 ;; will saturate if this topology runs too long. A production solution would
-;; track their saturations and swap them out, or use a time-decaying bloom
+;; track the saturation and swap them out, or use a time-decaying bloom
 ;; filter variation.
 (defbolt impression-click-join ["ad-id" "clicked"]
          {:prepare true} ; This indicates this is a stateful bolt.
          [conf context collector]
          (let [
                ;; Bloom filter with 10 hashes that saturates at 100k elements.
-               impression-filter (bf/make-optimal-filter 100000 0.01)
-               click-filter (bf/make-optimal-filter 100000 0.01)]
+               user-id-filter (bf/make-optimal-filter 100000 0.01)]
             (bolt
               (execute [tuple]
                 (let [user-id (.getString tuple 0)
@@ -77,21 +76,21 @@
                           "impression"
                             (do (emit-bolt! collector [ad-id false] :anchor tuple)
                                 ;; Check if we've seen a click from this user.
-                                (if (bf/include? click-filter user-id)
+                                (if (bf/include? user-id-filter user-id)
                                     ;; Hooray! Emit a completed click.
                                     (emit-bolt! collector [ad-id true] 
                                                 :anchor tuple)
                                     ;; Oh no! Save the user id in the impression
                                     ;; set.
-                                    (bf/add! impression-filter user-id)))
+                                    (bf/add! user-id-filter user-id)))
                           "click"
                           ;; Check if we've seen an impression from this user.
-                          (if (bf/include? impression-filter user-id)
+                          (if (bf/include? user-id-filter user-id)
                               ;; Hooray! Emit a completed click.
                               (emit-bolt! collector [ad-id true]
                                           :anchor tuple)
                               ;; Oh no! Save the user id in the click set.
-                              (bf/add! click-filter user-id))))
+                              (bf/add! user-id-filter user-id))))
                   (ack! collector tuple)))))
   
   ;; Calculate the cumulative moving average of the clicks and impressions.
